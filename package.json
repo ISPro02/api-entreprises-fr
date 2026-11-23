@@ -1,0 +1,40 @@
+{
+  "name": "api-entreprises-fr",
+  "version": "1.0.0",
+  "description": "Micro-API commerciale monétisée via le protocole x402 pour vérifier les entreprises françaises",
+  "main": "index.js",
+  "bin": {
+    "mcp-entreprises-fr": "./mcp-server.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "test": "node test-client.js",
+    "mcp": "node mcp-server.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "x402",
+    "usdc",
+    "base",
+    "api-gouv",
+    "entreprises",
+    "siren",
+    "siret",
+    "ai-agents"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.10",
+    "express": "^5.3.0",
+    "x402-express": "^1.2.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "isomorphic-git": "^1.44.18"
+  }
+}
