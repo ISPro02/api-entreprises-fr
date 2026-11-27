@@ -29,6 +29,7 @@ async function push() {
       dir: '.',
       remote: 'origin',
       ref: 'main',
+      force: true,
       onAuth: () => ({ username: token, password: '' })
     });
 
