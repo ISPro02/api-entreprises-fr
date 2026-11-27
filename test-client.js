@@ -1,12 +1,13 @@
 /**
  * =============================================================================
- * Script de Test Client pour l'API Entreprises France (Protocole x402)
+ * Script de Test Client pour l'API Entreprises France (Protocole x402 & MCP)
  * =============================================================================
  *
- * Ce script permet de valider le bon fonctionnement de l'API :
+ * Ce script permet de valider le bon fonctionnement de l'ensemble de la solution :
  * 1. Vérification de la route publique libre (GET /) -> 200 OK
  * 2. Vérification de la protection x402 (GET /api/company?q=...) -> 402 Payment Required
  * 3. Validation de l'extraction des données et du calcul de la TVA intracommunautaire
+ * 4. Validation de l'appel direct de l'outil MCP verify_french_company et des 4 annotations
  *
  * Si le serveur n'est pas déjà lancé sur le port configuré, le script démarre
  * une instance temporaire en mémoire pour exécuter les tests puis s'arrête.
@@ -158,13 +159,62 @@ async function runTests() {
       console.log(`  ${colors.yellow}⚠ Avertissement : Impossible d'interroger recherche-entreprises.api.gouv.fr (${gouvRes.status})${colors.reset}`);
     }
 
+    console.log('\n' + '-'.repeat(54) + '\n');
+
+    // -------------------------------------------------------------------------
+    // TEST 4 : Appel direct de l'outil MCP verify_french_company & annotations
+    // -------------------------------------------------------------------------
+    totalTests++;
+    console.log(`${colors.bold}Test 4 : Appel direct de l'outil MCP verify_french_company et vérification des 4 annotations${colors.reset}`);
+    const { verifyFrenchCompany, server: mcpServer } = require('./mcp-server');
+
+    // 1. Vérification des 4 annotations MCP enregistrées sur l'outil
+    const registeredTool = mcpServer._registeredTools['verify_french_company'];
+    const annotationsOk =
+      registeredTool &&
+      registeredTool.annotations &&
+      registeredTool.annotations.readOnlyHint === true &&
+      registeredTool.annotations.destructiveHint === false &&
+      registeredTool.annotations.idempotentHint === true &&
+      registeredTool.annotations.openWorldHint === true;
+
+    // 2. Appel direct de l'outil avec le SIREN 552032534 (Danone)
+    const mcpResponse = await verifyFrenchCompany({ query: '552032534' });
+
+    let mcpPayload = null;
+    try {
+      if (mcpResponse && Array.isArray(mcpResponse.content) && mcpResponse.content[0]) {
+        mcpPayload = JSON.parse(mcpResponse.content[0].text);
+      }
+    } catch {
+      mcpPayload = null;
+    }
+
+    const mcpExecutionOk =
+      mcpPayload &&
+      (mcpPayload.status === 'PAYMENT_REQUIRED' || mcpPayload.siren === '552032534' || mcpPayload.nom_complet);
+
+    if (annotationsOk && mcpExecutionOk) {
+      console.log(`  ${colors.green}✔ Succès : Outil MCP verify_french_company validé avec succès !${colors.reset}`);
+      console.log(`  - readOnlyHint    : ${registeredTool.annotations.readOnlyHint}`);
+      console.log(`  - destructiveHint : ${registeredTool.annotations.destructiveHint}`);
+      console.log(`  - idempotentHint  : ${registeredTool.annotations.idempotentHint}`);
+      console.log(`  - openWorldHint   : ${registeredTool.annotations.openWorldHint}`);
+      console.log(`  - Statut réponse  : ${mcpPayload.status || 'OK'}`);
+      passedTests++;
+    } else {
+      console.log(`  ${colors.red}✖ Échec de validation de l'outil MCP ou des annotations${colors.reset}`);
+      if (!annotationsOk) console.log('  Annotations incorrectes :', registeredTool ? registeredTool.annotations : 'outil non trouvé');
+      if (!mcpExecutionOk) console.log('  Réponse MCP inattendue :', mcpResponse);
+    }
+
     // -------------------------------------------------------------------------
     // Bilan
     // -------------------------------------------------------------------------
     console.log(`\n${colors.bold}${colors.cyan}======================================================${colors.reset}`);
     if (passedTests === totalTests) {
       console.log(`${colors.bold}${colors.green}   RÉSULTAT : ${passedTests}/${totalTests} tests réussis avec succès ! 🎉${colors.reset}`);
-      console.log(`${colors.green}   L'API est prête pour la production et conforme aux exigences x402.${colors.reset}`);
+      console.log(`${colors.green}   L'API et le serveur MCP sont prêts pour la production et conformes aux spécifications.${colors.reset}`);
     } else {
       console.log(`${colors.bold}${colors.red}   RÉSULTAT : ${passedTests}/${totalTests} tests réussis. Vérifiez les erreurs ci-dessus.${colors.reset}`);
     }
